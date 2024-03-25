@@ -1,9 +1,8 @@
 ---
-title: "My title"
+title: ""
 subtitle: "My subtitle if needed"
 author: 
-  - First author
-  - Another author
+  - Sean Liu
 thanks: "Code and data are available at: LINK."
 date: today
 date-format: long
@@ -19,7 +18,11 @@ bibliography: references.bib
 #| message: false
 
 library(tidyverse)
-library(palmerpenguins)
+library(nflverse)
+library(dplyr)
+library(tidyr)
+library(randomForest)
+library(lubridate)
 ```
 
 
@@ -28,6 +31,17 @@ library(palmerpenguins)
 You can and should cross-reference sections and sub-sections. We use @citeR and @rohan.
 
 The remainder of this paper is structured as follows. @sec-data....
+```{r}
+#| echo: false
+#| include: true
+#| message: false
+
+## Read in the data
+cleaned_data <-
+  load_player_stats(seasons = 2023) |> 
+  filter(season_type == "REG" & position == "QB" & week <= 9)
+
+```
 
 
 
@@ -40,13 +54,8 @@ Some of our data is of penguins (@fig-bills), from @palmerpenguins.
 #| fig-cap: Bills of penguins
 #| echo: false
 
-ggplot(penguins, aes(x = island, fill = species)) +
-  geom_bar(alpha = 0.8) +
-  scale_fill_manual(values = c("darkorange","purple","cyan4"),
-                    guide = "none") +
-  theme_minimal() +
-  facet_wrap(~species, ncol = 1) +
-  coord_flip()
+cleaned_data
+
 ```
 
 Talk more about it.
@@ -60,14 +69,52 @@ And also planes (@fig-planes). (You can change the height and width, but don't w
 #| warning: false
 #| message: false
 
-analysis_data <- read_csv(here::here("data/analysis_data/analysis_data.csv"))
+# Calculate rolling averages for passing EPA
+qb_stats <- cleaned_data %>%
+  group_by(player_id) %>%
+  arrange(week) %>%
+  mutate(rolling_passing_epa = mean(passing_epa, 3, fill = NA, align = 'right')
+  )
 
-analysis_data |> 
-  ggplot(aes(x = width, y = length)) +
-  geom_point(alpha = 0.8) +
-  theme_minimal() +
-  labs(x = "Wing width (mm)",
-       y = "Wing length (mm)")
+qb_stats_NA <- drop_na(qb_stats, c("passing_epa"))
+
+
+# Include more features like opponent defense quality, player health status, etc.
+# This is a placeholder for additional feature engineering
+# qb_stats <- qb_stats %>%
+#   mutate(opponent_defense = ...,
+#          player_health = ...)
+
+# Split the data into training and testing sets
+# Let's assume we're using Weeks 1-7 for training and Weeks 8-9 for validation
+training_set <- qb_stats_NA %>% filter(week <= 7)
+validation_set <- qb_stats_NA %>% filter(week > 7 & week <= 9)
+
+# Model Training
+# We'll predict the rolling_passing_epa as our target variable
+set.seed(123) # for reproducibility
+rf_model <- randomForest(passing_epa ~ . -player_id -week -passing_epa, data = training_set, importance = TRUE, ntree = 500)
+
+# Model Evaluation
+# Predict on the validation set
+validation_predictions <- predict(rf_model, newdata = validation_set)
+
+# Evaluate the model performance using appropriate metrics, e.g., RMSE
+rmse <- sqrt(mean((validation_set$rolling_passing_epa - validation_predictions)^2))
+print(paste("Validation RMSE:", rmse))
+
+# Feature Importance
+importance(rf_model)
+
+# Forecasting for Weeks 10-18
+# You would need to prepare the feature set for Weeks 10-18 in the same way as the training set
+# Here's a placeholder for the forecasting process
+
+# weeks_10_18_data <- ...
+# weeks_10_18_predictions <- predict(rf_model, newdata = weeks_10_18_data)
+
+# Output the predictions
+# print(weeks_10_18_predictions)
 ```
 
 Talk way more about it. 
@@ -80,136 +127,7 @@ The goal of our modelling strategy is twofold. Firstly,...
 
 Here we briefly describe the Bayesian analysis model used to investigate... Background details and diagnostics are included in [Appendix -@sec-model-details].
 
-## Model set-up
 
-Define $y_i$ as the number of seconds that the plane remained aloft. Then $\beta_i$ is the wing width and $\gamma_i$ is the wing length, both measured in millimeters.  
-
-\begin{align} 
-y_i|\mu_i, \sigma &\sim \mbox{Normal}(\mu_i, \sigma) \\
-\mu_i &= \alpha + \beta_i + \gamma_i\\
-\alpha &\sim \mbox{Normal}(0, 2.5) \\
-\beta &\sim \mbox{Normal}(0, 2.5) \\
-\gamma &\sim \mbox{Normal}(0, 2.5) \\
-\sigma &\sim \mbox{Exponential}(1)
-\end{align}
-
-We run the model in R [@citeR] using the `rstanarm` package of @rstanarm. We use the default priors from `rstanarm`.
-
-
-### Model justification
-
-We expect a positive relationship between the size of the wings and time spent aloft. In particular...
-
-We can use maths by including latex between dollar signs, for instance $\theta$.
-
-
-# Results
-
-Our results are summarized in @tbl-modelresults.
-
-```{r}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-
-library(rstanarm)
-
-first_model <-
-  readRDS(file = here::here("models/first_model.rds"))
-```
-
-```{r}
-#| echo: false
-#| eval: true
-#| label: tbl-modelresults
-#| tbl-cap: "Explanatory models of flight time based on wing width and wing length"
-#| warning: false
-
-modelsummary::modelsummary(
-  list(
-    "First model" = first_model
-  ),
-  statistic = "mad",
-  fmt = 2
-)
-```
-
-
-
-
-# Discussion
-
-## First discussion point {#sec-first-point}
-
-If my paper were 10 pages, then should be be at least 2.5 pages. The discussion is a chance to show off what you know and what you learnt from all this. 
-
-## Second discussion point
-
-## Third discussion point
-
-## Weaknesses and next steps
-
-Weaknesses and next steps should also be included.
-
-\newpage
-
-\appendix
-
-# Appendix {-}
-
-
-# Additional data details
-
-# Model details {#sec-model-details}
-
-## Posterior predictive check
-
-In @fig-ppcheckandposteriorvsprior-1 we implement a posterior predictive check. This shows...
-
-In @fig-ppcheckandposteriorvsprior-2 we compare the posterior with the prior. This shows... 
-
-```{r}
-#| eval: true
-#| echo: false
-#| message: false
-#| warning: false
-#| label: fig-ppcheckandposteriorvsprior
-#| layout-ncol: 2
-#| fig-cap: "Examining how the model fits, and is affected by, the data"
-#| fig-subcap: ["Posterior prediction check", "Comparing the posterior with the prior"]
-
-pp_check(first_model) +
-  theme_classic() +
-  theme(legend.position = "bottom")
-
-posterior_vs_prior(first_model) +
-  theme_minimal() +
-  scale_color_brewer(palette = "Set1") +
-  theme(legend.position = "bottom") +
-  coord_flip()
-```
-
-## Diagnostics
-
-@fig-stanareyouokay-1 is a trace plot. It shows... This suggests...
-
-@fig-stanareyouokay-2 is a Rhat plot. It shows... This suggests...
-
-```{r}
-#| echo: false
-#| eval: true
-#| message: false
-#| warning: false
-#| label: fig-stanareyouokay
-#| fig-cap: "Checking the convergence of the MCMC algorithm"
-#| fig-subcap: ["Trace plot", "Rhat plot"]
-#| layout-ncol: 2
-
-plot(first_model, "trace")
-
-plot(first_model, "rhat")
-```
 
 
 
