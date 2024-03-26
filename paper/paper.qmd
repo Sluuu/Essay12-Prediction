@@ -41,6 +41,8 @@ cleaned_data <-
   load_player_stats(seasons = 2023) |> 
   filter(season_type == "REG" & position == "QB" & week <= 9)
 
+data <- read_csv(here::here("data/analysis_data/cleaned_data.csv"))
+
 ```
 
 
