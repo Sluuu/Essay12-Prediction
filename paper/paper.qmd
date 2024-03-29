@@ -1,14 +1,15 @@
 ---
-title: ""
+title: "Forecasting "
 subtitle: "My subtitle if needed"
 author: 
   - Sean Liu
-thanks: "Code and data are available at: LINK."
+thanks: "Code and data are available at: https://github.com/Sluuu/Essay12-Prediction"
 date: today
 date-format: long
 abstract: "First sentence. Second sentence. Third sentence. Fourth sentence."
 format: pdf
 number-sections: true
+toc: true
 bibliography: references.bib
 ---
 
@@ -23,6 +24,8 @@ library(dplyr)
 library(tidyr)
 library(randomForest)
 library(lubridate)
+library(readr)
+library(caret)
 ```
 
 
@@ -37,26 +40,55 @@ The remainder of this paper is structured as follows. @sec-data....
 #| message: false
 
 ## Read in the data
-cleaned_data <-
-  load_player_stats(seasons = 2023) |> 
-  filter(season_type == "REG" & position == "QB" & week <= 9)
-
 data <- read_csv(here::here("data/analysis_data/cleaned_data.csv"))
-
 ```
 
 
 
 # Data {#sec-data}
 
-Some of our data is of penguins (@fig-bills), from @palmerpenguins.
+Our data is from the package `nflverse` @nflverse. The package includes the data of the National Football League. As the data contains too many information, I have cleaned the data that filter player statistics for the 2023 NFL season. It specifically targets quarterback (QB) statistics from the regular season (REG) up to week 9. And I will be forecasting the model of passing_epa for week 10-18. Inside my data, I have chosen 10 variables that I think would be important to the study.
+
+- `player_name`: It shows the name of the player
+- `recent_team`: It shows the most recent team the player plays in
+- `week`: It shows the game week number 
+- `passing_yards`: It shows the yards gained on pass plays
+- `passing_tds`: It shows the number of passing touchdowns
+- `interceptions`: It shows the number of interceptions thrown
+- `attempts`: It shows the number of pass attempts by the NFL
+- `completions`: It shows the number of completed passes
+- `passing_epa`: It shows the total expected points added on pass attempts and sacks
+- `completion_rate`: This is a new variable I created, it is calculated by the completions divided by attempts. Which shows the passes completion rates.
+
+After filtering my data set, there are 335 observations. However, it also contains some missing values, which I will be dropping/eliminating them. As there weren't a lot of missing values. Which concluded that there are 316 observations and 10 variables in my data-set.
 
 ```{r}
-#| label: fig-bills
-#| fig-cap: Bills of penguins
+#| label: fig-data
+#| fig-cap: Summary of the statistics
 #| echo: false
+#| warning: false
+#| message: false
 
-cleaned_data
+qb_data <- data %>%
+  select(player_name, recent_team, week, passing_yards, passing_tds, interceptions, attempts, completions, passing_epa) %>%
+  mutate(completion_rate = completions / attempts)
+
+# Drop missing values
+qb_data <- na.omit(qb_data)
+
+summary(qb_data)
+
+```
+In @fig-data, it shows the summary of my dataset. There are two types of variables, numerical and categorical. In Numerical variables, such as `passing_yards`, `week`, `passing_tds`, `interceptions`, `passing_attempts`, `passing_completions`, `passing_epa`, and `completion_rate`. It summarize Min: the minimum value, 1st Qu: The first quartile (25th percentile), Median: The median (50th percentile), Mean: The average of the values. 3rd Qu: The third quartile (75th percentile), and Max: The maximum value. These statistics provide insights into the distribution of each numerical variable. Which helps me to understand the performance of quarterbacks in terms of passing yards, touchdowns, interceptions, etc., until week 9 of the 2023 regular season. The next variable is the categorical variables, which are `player_name` and `recent_team`.
+
+```{r}
+#| label: fig-data
+#| fig-cap: Summary of the statistics
+#| echo: false
+#| warning: false
+#| message: false
+
+pairs(~passing_epa + passing_yards + passing_tds + interceptions + completion_rate, data = qb_data)
 
 ```
 
@@ -64,60 +96,7 @@ Talk more about it.
 
 And also planes (@fig-planes). (You can change the height and width, but don't worry about doing that until you have finished every other aspect of the paper - Quarto will try to make it look nice and the defaults usually work well once you have enough text.)
 
-```{r}
-#| label: fig-planes
-#| fig-cap: Relationship between wing length and width
-#| echo: false
-#| warning: false
-#| message: false
 
-# Calculate rolling averages for passing EPA
-qb_stats <- cleaned_data %>%
-  group_by(player_id) %>%
-  arrange(week) %>%
-  mutate(rolling_passing_epa = mean(passing_epa, 3, fill = NA, align = 'right')
-  )
-
-qb_stats_NA <- drop_na(qb_stats, c("passing_epa"))
-
-
-# Include more features like opponent defense quality, player health status, etc.
-# This is a placeholder for additional feature engineering
-# qb_stats <- qb_stats %>%
-#   mutate(opponent_defense = ...,
-#          player_health = ...)
-
-# Split the data into training and testing sets
-# Let's assume we're using Weeks 1-7 for training and Weeks 8-9 for validation
-training_set <- qb_stats_NA %>% filter(week <= 7)
-validation_set <- qb_stats_NA %>% filter(week > 7 & week <= 9)
-
-# Model Training
-# We'll predict the rolling_passing_epa as our target variable
-set.seed(123) # for reproducibility
-rf_model <- randomForest(passing_epa ~ . -player_id -week -passing_epa, data = training_set, importance = TRUE, ntree = 500)
-
-# Model Evaluation
-# Predict on the validation set
-validation_predictions <- predict(rf_model, newdata = validation_set)
-
-# Evaluate the model performance using appropriate metrics, e.g., RMSE
-rmse <- sqrt(mean((validation_set$rolling_passing_epa - validation_predictions)^2))
-print(paste("Validation RMSE:", rmse))
-
-# Feature Importance
-importance(rf_model)
-
-# Forecasting for Weeks 10-18
-# You would need to prepare the feature set for Weeks 10-18 in the same way as the training set
-# Here's a placeholder for the forecasting process
-
-# weeks_10_18_data <- ...
-# weeks_10_18_predictions <- predict(rf_model, newdata = weeks_10_18_data)
-
-# Output the predictions
-# print(weeks_10_18_predictions)
-```
 
 Talk way more about it. 
 
@@ -125,10 +104,28 @@ Talk way more about it.
 
 # Model
 
-The goal of our modelling strategy is twofold. Firstly,...
+```{r}
+# Split the data - this is a simplistic split, consider a more sophisticated time series approach
+set.seed(123)  # For reproducibility
+train_index <- createDataPartition(qb_data$week, p = 0.8, list = FALSE, times = 1)
+train_data <- qb_data[train_index, ]
+test_data <- qb_data[-train_index, ]
 
-Here we briefly describe the Bayesian analysis model used to investigate... Background details and diagnostics are included in [Appendix -@sec-model-details].
+# Train the Random Forest model
+model <- randomForest(passing_epa ~ . - player_name - recent_team - week, data = train_data)
 
+```
+
+
+```{r}
+# Predict on the test set
+predictions <- predict(model, test_data)
+
+# Evaluate the model
+model_performance <- postResample(predictions, test_data$passing_epa)
+print(model_performance)
+
+```
 
 
 
