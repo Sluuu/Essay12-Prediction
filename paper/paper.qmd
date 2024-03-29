@@ -1,12 +1,11 @@
 ---
-title: "Forecasting "
-subtitle: "My subtitle if needed"
+title: "The best method in forecasting NFL statistics on passing epa"
 author: 
   - Sean Liu
 thanks: "Code and data are available at: https://github.com/Sluuu/Essay12-Prediction"
 date: today
 date-format: long
-abstract: "First sentence. Second sentence. Third sentence. Fourth sentence."
+abstract: "This report shows an approach to forecasting NFL quarterback performance. offering valuable perspectives for coaches and analysts. In order to predict the future team success."
 format: pdf
 number-sections: true
 toc: true
@@ -30,10 +29,9 @@ library(caret)
 
 
 # Introduction
+In the National Football League (NFL), understanding and predicting quarterback performance an important aspect of game strategy and player evaluation. The Passing Expected Points Added (passing_epa) stands out as an important metrics that captures a quarterback's contribution to the team's scoring potential on each play.
+This report uses predictive modeling, to forecast NFL quarterbacks' passing EPA based on their performance in the first nine weeks of the 2023 regular season.
 
-You can and should cross-reference sections and sub-sections. We use @citeR and @rohan.
-
-The remainder of this paper is structured as follows. @sec-data....
 ```{r}
 #| echo: false
 #| include: true
@@ -79,11 +77,11 @@ qb_data <- na.omit(qb_data)
 summary(qb_data)
 
 ```
-In @fig-data, it shows the summary of my dataset. There are two types of variables, numerical and categorical. In Numerical variables, such as `passing_yards`, `week`, `passing_tds`, `interceptions`, `passing_attempts`, `passing_completions`, `passing_epa`, and `completion_rate`. It summarize Min: the minimum value, 1st Qu: The first quartile (25th percentile), Median: The median (50th percentile), Mean: The average of the values. 3rd Qu: The third quartile (75th percentile), and Max: The maximum value. These statistics provide insights into the distribution of each numerical variable. Which helps me to understand the performance of quarterbacks in terms of passing yards, touchdowns, interceptions, etc., until week 9 of the 2023 regular season. The next variable is the categorical variables, which are `player_name` and `recent_team`.
+In the summary statistics above, it shows the summary of my dataset. There are two types of variables, numerical and categorical. In Numerical variables, such as `passing_yards`, `week`, `passing_tds`, `interceptions`, `passing_attempts`, `passing_completions`, `passing_epa`, and `completion_rate`. It summarize Min: the minimum value, 1st Qu: The first quartile (25th percentile), Median: The median (50th percentile), Mean: The average of the values. 3rd Qu: The third quartile (75th percentile), and Max: The maximum value. These statistics provide insights into the distribution of each numerical variable. Which helps me to understand the performance of quarterbacks in terms of passing yards, touchdowns, interceptions, etc., until week 9 of the 2023 regular season. The next variable is the categorical variables, which are `player_name` and `recent_team`.
 
 ```{r}
-#| label: fig-data
-#| fig-cap: Summary of the statistics
+#| label: fig-relationship
+#| fig-cap: Scatterplot matrix of each variables
 #| echo: false
 #| warning: false
 #| message: false
@@ -92,21 +90,20 @@ pairs(~passing_epa + passing_yards + passing_tds + interceptions + completion_ra
 
 ```
 
-Talk more about it.
-
-And also planes (@fig-planes). (You can change the height and width, but don't worry about doing that until you have finished every other aspect of the paper - Quarto will try to make it look nice and the defaults usually work well once you have enough text.)
-
-
-
-Talk way more about it. 
+From @fig-relationship, it shows the variables included in the scatterplot matrix. Each variable will be plotted against every other variable in the matrix. Each row represents one of the variables with the oreder, `passing_epa`, `passing_yards`, `passing_tds`, `interceptions`, and `completion_rate`. Inside each cell of the matrix, where the variable corresponding to the row is plotted on the y-axis and the variable corresponding to the column is plotted on the x-axis. This graph helps us to visualize the relationships between the variables in my dataset.
 
 
 
 # Model
+The model and the data were constructed in R [@citeR] with the help of the following packages, `nflverse` package of @nflverse, `tidyr` package of @tidyr, `randomForest` package of @randomForest, `dplyr` package of @dplyr, `lubridate` package of @lubridate,  `caret` package of @caret, and `readr`` @readr. 
 
+For my model, I will first split my data into 2 sets, training and testing sets. It is separated by variable `week` and 80% of the data will be allocated into the training set. Then I will use the random Forest model to predict the variable `passing_eba` based on all other except for `player_name`, `recent_team`, and `week`. The code sets up a predictive model where the target variable is passing_epa, and it uses the quarterback's performance data as predictors.
 ```{r}
-# Split the data - this is a simplistic split, consider a more sophisticated time series approach
-set.seed(123)  # For reproducibility
+#| echo: false
+#| warning: false
+#| message: false
+# Split the data 
+set.seed(123) 
 train_index <- createDataPartition(qb_data$week, p = 0.8, list = FALSE, times = 1)
 train_data <- qb_data[train_index, ]
 test_data <- qb_data[-train_index, ]
@@ -118,6 +115,9 @@ model <- randomForest(passing_epa ~ . - player_name - recent_team - week, data =
 
 
 ```{r}
+#| echo: false
+#| warning: false
+#| message: false
 # Predict on the test set
 predictions <- predict(model, test_data)
 
@@ -126,7 +126,20 @@ model_performance <- postResample(predictions, test_data$passing_epa)
 print(model_performance)
 
 ```
+I have used the postResample function from the `caret` @caret package, which provides a summary of the predictive model. By comparing the predicted `passing_epa` from your model and the actual `passing_epa` values from the test dataset. The output has three key metrics: RMSE (Root Mean Squared Error), R-squared (Rsquared), and MAE (Mean Absolute Error).
 
+The RMSE equals to 5.9451548: This is the square root of the average of the squares of the errors. RMSE is a measure of the model's prediction error, with lower values indicating a better fit. In this study, RMSE of 5.9451548 means that, on average, the model's predictions are about 5.9451548 units away from the actual values on the `passing_epa` scale.
+
+The R-squared equals to 0.6583139: This measure shows how close the data are to the fitted regression line. R-squared ranges from 0 to 1, where 0 means that the model explains none of the variability of the response data around its mean, and 1 means that it explains all the variability. An R-squared of 0.6583139 suggests that approximately 65.83% of the variation in passing_epa can be explained by the model's predictors.
+
+The MAE equals to 4.5219004: This is the average of the absolute errors. Like RMSE, MAE gives an idea of how wrong the model's predictions are, a lower MAE indicates a better model. An MAE of 4.5219004 means that, on average, the model's predictions are about 4.5219004 units away from the actual value.
+
+# Conclusion
+In the analysis of NFL quarterback performance, focusing on `passing_epa`. I chose the Random Forest model due to its robustness and its ability to handle non-linear relationships. After training and testing the model on the first nine weeks of the 2023 NFL season data, I found the Random Forest model to provide great predictive accuracy.
+
+The model's prediction results, as showed by metrics such as RMSE, MAE, and R-squared, was found to be compelling. An RMSE of 5.945 and an MAE of 4.522, coupled with an R-squared value of 0.658, indicate a model that provides reliable and accurate forecasts of passing EPA.
+
+The Random Forest model's ability to generalize well from our training data to the test data suggests it can reliably forecast future quarterback performance in the regular season's remaining weeks.
 
 
 
